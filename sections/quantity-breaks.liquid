@@ -1,0 +1,211 @@
+{{ 'quantity-breaks.css' | asset_url | stylesheet_tag }}
+<script src="{{ 'quantity-breaks.js' | asset_url }}" defer></script>
+
+{%- liquid
+  assign qb_tiers = ''
+  assign qb_accent = section.settings.accent_color | default: '#1f2937'
+
+  for block in section.blocks
+    assign qb_badge = block.settings.badge | replace: ',', ' ' | replace: ':', ' ' | replace: '|', ' ' | strip
+    assign qb_entry = block.settings.min_quantity | append: ':' | append: block.settings.discount_percent | append: ':' | append: qb_badge
+
+    if qb_tiers == ''
+      assign qb_tiers = qb_entry
+    else
+      assign qb_tiers = qb_tiers | append: ',' | append: qb_entry
+    endif
+  endfor
+-%}
+
+<div
+  class="quantity-breaks-section"
+  style="
+    --qb-text: {{ section.settings.text_color | default: '#111111' }};
+    --qb-muted: {{ section.settings.muted_color | default: '#6b7280' }};
+    --qb-border: {{ section.settings.border_color | default: '#d9dce1' }};
+    --qb-accent: {{ qb_accent }};
+    --qb-accent-soft: {{ qb_accent | color_modify: 'alpha', 0.08 }};
+    --qb-badge-background: {{ qb_accent }};
+    --qb-badge-text: {{ section.settings.badge_text_color | default: '#ffffff' }};
+  "
+>
+  {%- if product != blank -%}
+    {%- render 'quantity-breaks',
+      product: product,
+      tiers: qb_tiers,
+      uid: section.id,
+      heading: section.settings.heading,
+      note: section.settings.note,
+      qty_label: section.settings.qty_label,
+      each_label: section.settings.each_label,
+      save_label: section.settings.save_label,
+      quantity_selector: section.settings.quantity_selector,
+      form_selector: section.settings.form_selector
+    -%}
+  {%- elsif request.design_mode -%}
+    <p class="quantity-breaks__note">
+      Quantity breaks only render on a product template, where a product is available.
+    </p>
+  {%- endif -%}
+</div>
+
+{% schema %}
+{
+  "name": "Quantity breaks",
+  "tag": "section",
+  "class": "section-quantity-breaks",
+  "enabled_on": {
+    "templates": ["product"]
+  },
+  "settings": [
+    {
+      "type": "text",
+      "id": "heading",
+      "label": "Heading",
+      "default": "Buy more, save more"
+    },
+    {
+      "type": "text",
+      "id": "note",
+      "label": "Note under the tiers",
+      "info": "Good place to say the discount is applied automatically in the cart.",
+      "default": "Discounts are applied automatically at checkout."
+    },
+    {
+      "type": "header",
+      "content": "Labels"
+    },
+    {
+      "type": "text",
+      "id": "qty_label",
+      "label": "Quantity label",
+      "info": "Use [qty] where the quantity should appear.",
+      "default": "Buy [qty]+"
+    },
+    {
+      "type": "text",
+      "id": "each_label",
+      "label": "Per-unit label",
+      "default": "each"
+    },
+    {
+      "type": "text",
+      "id": "save_label",
+      "label": "Savings label",
+      "info": "Use [percent] where the discount should appear.",
+      "default": "Save [percent]%"
+    },
+    {
+      "type": "header",
+      "content": "Colors"
+    },
+    {
+      "type": "color",
+      "id": "text_color",
+      "label": "Text",
+      "default": "#111111"
+    },
+    {
+      "type": "color",
+      "id": "muted_color",
+      "label": "Secondary text",
+      "default": "#6b7280"
+    },
+    {
+      "type": "color",
+      "id": "border_color",
+      "label": "Tier border",
+      "default": "#d9dce1"
+    },
+    {
+      "type": "color",
+      "id": "accent_color",
+      "label": "Selected tier / badge",
+      "default": "#1f2937"
+    },
+    {
+      "type": "color",
+      "id": "badge_text_color",
+      "label": "Badge text",
+      "default": "#ffffff"
+    },
+    {
+      "type": "header",
+      "content": "Advanced"
+    },
+    {
+      "type": "text",
+      "id": "quantity_selector",
+      "label": "Quantity input selector",
+      "info": "Only change this if your theme's quantity field is not named \"quantity\".",
+      "default": "[name=\"quantity\"]"
+    },
+    {
+      "type": "text",
+      "id": "form_selector",
+      "label": "Product form selector",
+      "info": "Leave empty to use the nearest add-to-cart form on the page."
+    }
+  ],
+  "blocks": [
+    {
+      "type": "tier",
+      "name": "Tier",
+      "settings": [
+        {
+          "type": "number",
+          "id": "min_quantity",
+          "label": "Minimum quantity",
+          "default": 2
+        },
+        {
+          "type": "range",
+          "id": "discount_percent",
+          "label": "Discount",
+          "min": 0,
+          "max": 60,
+          "step": 1,
+          "unit": "%",
+          "default": 10
+        },
+        {
+          "type": "text",
+          "id": "badge",
+          "label": "Badge",
+          "info": "Optional, e.g. Most popular. Commas and colons are removed."
+        }
+      ]
+    }
+  ],
+  "max_blocks": 6,
+  "presets": [
+    {
+      "name": "Quantity breaks",
+      "blocks": [
+        {
+          "type": "tier",
+          "settings": {
+            "min_quantity": 1,
+            "discount_percent": 0
+          }
+        },
+        {
+          "type": "tier",
+          "settings": {
+            "min_quantity": 3,
+            "discount_percent": 10,
+            "badge": "Most popular"
+          }
+        },
+        {
+          "type": "tier",
+          "settings": {
+            "min_quantity": 6,
+            "discount_percent": 15
+          }
+        }
+      ]
+    }
+  ]
+}
+{% endschema %}

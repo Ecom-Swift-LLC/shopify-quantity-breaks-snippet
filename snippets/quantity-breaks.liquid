@@ -1,0 +1,163 @@
+{%- comment -%}
+  Quantity breaks
+  ---------------
+  Renders volume / tiered pricing options for a product and wires them to the
+  theme's quantity input, so a shopper can jump straight to a discounted tier.
+
+  This snippet only DISPLAYS the tiers. The discount itself is applied by an
+  automatic discount created in the Shopify admin (see the README), which keeps
+  cart and checkout totals correct without faking prices in the theme.
+
+  Parameters
+    product            (required) product object
+    tiers              (required) "min:percent[:badge]" entries, comma separated,
+                                  e.g. 3:5,6:10:Most popular,12:15
+    uid                unique suffix for element ids (default: the product id)
+    heading            heading text above the tiers
+    note               small line under the tiers
+    qty_label          tier quantity label, [qty] is replaced (default: Buy [qty]+)
+    each_label         suffix after the per-unit price (default: each)
+    save_label         savings label, [percent] is replaced (default: Save [percent]%)
+    quantity_selector  CSS selector for the quantity input (default: [name="quantity"])
+    form_selector      CSS selector for the product form (default: nearest add-to-cart form)
+
+  Usage
+    render 'quantity-breaks', product: product, tiers: '3:5,6:10,12:15'
+{%- endcomment -%}
+
+{%- liquid
+  assign qb_product = product
+  assign qb_raw_tiers = tiers | split: ','
+  assign qb_normalized = ''
+
+  for qb_raw in qb_raw_tiers
+    assign qb_parts = qb_raw | strip | split: ':'
+    assign qb_min = qb_parts[0] | strip | plus: 0
+    assign qb_percent = qb_parts[1] | strip | plus: 0
+    assign qb_badge = qb_parts[2] | strip | replace: '|', ' '
+
+    if qb_min < 1
+      continue
+    endif
+    if qb_percent < 0
+      assign qb_percent = 0
+    endif
+    if qb_percent > 100
+      assign qb_percent = 100
+    endif
+
+    assign qb_entry = qb_min | append: ':' | append: qb_percent | append: ':' | append: qb_badge
+    if qb_normalized == ''
+      assign qb_normalized = qb_entry
+    else
+      assign qb_normalized = qb_normalized | append: '|' | append: qb_entry
+    endif
+  endfor
+
+  assign qb_tier_list = qb_normalized | split: '|'
+  assign qb_variant = qb_product.selected_or_first_available_variant
+  assign qb_base_price = qb_variant.price | default: qb_product.price
+  assign qb_uid = uid | default: qb_product.id
+  assign qb_qty_label = qty_label | default: 'Buy [qty]+'
+  assign qb_each_label = each_label | default: 'each'
+  assign qb_save_label = save_label | default: 'Save [percent]%'
+  assign qb_quantity_selector = quantity_selector | default: '[name="quantity"]'
+-%}
+
+{%- if qb_product != blank and qb_tier_list.size > 0 -%}
+  <div
+    class="quantity-breaks"
+    id="quantity-breaks-{{ qb_uid }}"
+    data-quantity-breaks
+    data-quantity-selector="{{ qb_quantity_selector | escape }}"
+    {% if form_selector != blank %}data-form-selector="{{ form_selector | escape }}"{% endif %}
+  >
+    {%- if heading != blank -%}
+      <h2 class="quantity-breaks__heading">{{ heading | escape }}</h2>
+    {%- endif -%}
+
+    <div class="quantity-breaks__grid" role="group" aria-labelledby="quantity-breaks-{{ qb_uid }}-label">
+      <span class="quantity-breaks__visually-hidden" id="quantity-breaks-{{ qb_uid }}-label">
+        {{- heading | default: 'Volume pricing' | escape -}}
+      </span>
+
+      {%- for qb_tier in qb_tier_list -%}
+        {%- liquid
+          assign qb_parts = qb_tier | split: ':'
+          assign qb_min = qb_parts[0] | plus: 0
+          assign qb_percent = qb_parts[1] | plus: 0
+          assign qb_badge = qb_parts[2]
+          assign qb_pay_percent = 100 | minus: qb_percent
+          assign qb_unit = qb_base_price | times: qb_pay_percent | divided_by: 100
+          assign qb_total = qb_unit | times: qb_min
+          assign qb_full = qb_base_price | times: qb_min
+          assign qb_min_text = qb_min | append: ''
+          assign qb_percent_text = qb_percent | append: ''
+        -%}
+        <button
+          type="button"
+          class="quantity-breaks__tier{% if qb_badge != blank %} quantity-breaks__tier--featured{% endif %}"
+          data-quantity-break
+          data-min-quantity="{{ qb_min }}"
+          data-percent="{{ qb_percent }}"
+          aria-pressed="false"
+        >
+          {%- if qb_badge != blank -%}
+            <span class="quantity-breaks__badge">{{ qb_badge | escape }}</span>
+          {%- endif -%}
+
+          <span class="quantity-breaks__qty">
+            {{- qb_qty_label | replace: '[qty]', qb_min_text | escape -}}
+          </span>
+
+          <span class="quantity-breaks__unit">
+            <span data-quantity-break-unit>{{ qb_unit | money }}</span>
+            <span class="quantity-breaks__each">{{ qb_each_label | escape }}</span>
+          </span>
+
+          <span class="quantity-breaks__meta">
+            {%- if qb_percent > 0 -%}
+              <span class="quantity-breaks__save">
+                {{- qb_save_label | replace: '[percent]', qb_percent_text | escape -}}
+              </span>
+              <s class="quantity-breaks__was" data-quantity-break-was>{{ qb_full | money }}</s>
+            {%- endif -%}
+            <span class="quantity-breaks__total" data-quantity-break-total>{{ qb_total | money }}</span>
+          </span>
+        </button>
+      {%- endfor -%}
+    </div>
+
+    {%- if note != blank -%}
+      <p class="quantity-breaks__note">{{ note | escape }}</p>
+    {%- endif -%}
+
+    {%- comment -%}
+      Every price the tiers can show, pre-formatted by Liquid for each variant, so
+      switching variants never falls back to guessing the store's money format.
+      Index order matches the buttons above.
+    {%- endcomment -%}
+    <script type="application/json" data-quantity-breaks-prices>
+      {
+      {%- for qb_v in qb_product.variants -%}
+        {%- unless forloop.first -%},{%- endunless -%}
+        "{{ qb_v.id }}": [
+        {%- for qb_tier in qb_tier_list -%}
+          {%- liquid
+            assign qb_parts = qb_tier | split: ':'
+            assign qb_min = qb_parts[0] | plus: 0
+            assign qb_percent = qb_parts[1] | plus: 0
+            assign qb_pay_percent = 100 | minus: qb_percent
+            assign qb_unit = qb_v.price | times: qb_pay_percent | divided_by: 100
+            assign qb_total = qb_unit | times: qb_min
+            assign qb_full = qb_v.price | times: qb_min
+          -%}
+          {%- unless forloop.first -%},{%- endunless -%}
+          {"u": {{ qb_unit | money | json }}, "t": {{ qb_total | money | json }}, "w": {{ qb_full | money | json }}}
+        {%- endfor -%}
+        ]
+      {%- endfor -%}
+      }
+    </script>
+  </div>
+{%- endif -%}
