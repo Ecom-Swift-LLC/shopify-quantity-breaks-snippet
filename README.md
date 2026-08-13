@@ -121,6 +121,14 @@ Using this free section on its own is completely fine, and it will keep working 
 
 Issues and pull requests are welcome. This is meant to be a solid, readable starting point for the Shopify community.
 
+## Need help?
+
+This project is maintained by **Ecom Swift LLC**, a Shopify Partner.
+
+- 🛍️ Shopify Partner Directory: https://www.shopify.com/partners/directory/partner/waowy
+- ✉️ Email: support@ecomswiftllc.com
+- 💬 WhatsApp: https://wa.me/16312511767
+
 ## License
 
 [MIT](LICENSE) © Ecom Swift LLC — an award winning Shopify partner company.
